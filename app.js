@@ -1,6 +1,14 @@
 const { useEffect, useRef, useState } = React;
 
-const Store = window.SiteStore;
+const LocalStore = window.SiteStore;
+const CloudStore = window.TrouthyCloudStore;
+const MAX_IMAGE_BYTES = CloudStore?.maxImageBytes || 8 * 1024 * 1024;
+const EMPTY_AUTH_STATE = {
+  configured: false,
+  user: null,
+  isEditor: false,
+  setupError: 'Shared editing has not been configured yet.'
+};
 const BUILTIN_SLUGS = ['intro', 'events', 'policy', 'welfare'];
 const SAMPLE_BRANCH_IDS = new Set([
   'intro-1', 'intro-2', 'intro-3',
@@ -65,6 +73,7 @@ const normaliseBranch = (branch, fallback = {}) => ({
   title: String(branch?.title ?? fallback.title ?? ''),
   body: String(branch?.body ?? branch?.description ?? fallback.body ?? ''),
   imageId: typeof branch?.imageId === 'string' ? branch.imageId : null,
+  imagePath: typeof branch?.imagePath === 'string' ? branch.imagePath : null,
   imageUrl: typeof branch?.imageUrl === 'string'
     ? branch.imageUrl
     : typeof branch?.image === 'string'
@@ -108,6 +117,13 @@ const normaliseDocument = (document) => {
   return { version: 3, pages: [...builtInPages, ...customPages] };
 };
 
+const unreferencedImagePaths = (document, imagePaths) => {
+  const retainedPaths = new Set(document.pages
+    .flatMap((page) => page.branches.map((branch) => branch.imagePath))
+    .filter(Boolean));
+  return [...new Set(imagePaths.filter((imagePath) => imagePath && !retainedPaths.has(imagePath)))];
+};
+
 const discardedSampleImageIds = (source, normalised) => {
   if ((Number(source?.version) || 1) >= 3 || !Array.isArray(source?.pages)) return [];
   const retainedImageIds = new Set(normalised.pages.flatMap((page) => page.branches.map((branch) => branch.imageId)).filter(Boolean));
@@ -132,40 +148,17 @@ const readHashSlug = () => {
 };
 
 const messageForError = (error) => {
+  if (error?.code === 'trouthy/not-configured') return 'Shared editing needs Firebase setup before changes can be saved.';
+  if (error?.code === 'trouthy/not-authorized' || error?.code === 'permission-denied' || error?.code === 'storage/unauthorized') return 'Only approved team accounts can change this site.';
+  if (error?.code === 'auth/popup-closed-by-user') return 'Google sign-in was closed before it finished.';
+  if (error?.code === 'storage/unauthenticated') return 'Sign in with an approved Google account before uploading a photo.';
   if (error?.name === 'QuotaExceededError') return 'Browser storage is full. Remove an image or free up browser storage, then try again.';
-  return error?.message || 'The change could not be saved in this browser.';
-};
-
-const useStoredImage = (imageId) => {
-  const [source, setSource] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl = '';
-    setSource('');
-    if (!imageId) return () => {};
-
-    Store.getImage(imageId)
-      .then((record) => {
-        if (cancelled || !record?.blob) return;
-        objectUrl = URL.createObjectURL(record.blob);
-        setSource(objectUrl);
-      })
-      .catch(() => setSource(''));
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [imageId]);
-
-  return source;
+  return error?.message || 'The change could not be shared with everyone.';
 };
 
 function BranchImage({ branch, alt, className = '', compact = false }) {
-  const storedSource = useStoredImage(branch.imageId);
   const [failed, setFailed] = useState(false);
-  const source = storedSource || branch.imageUrl;
+  const source = branch.imageUrl;
 
   useEffect(() => setFailed(false), [source]);
 
@@ -226,10 +219,16 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
       reportError(message);
       return;
     }
+    if (file.size > MAX_IMAGE_BYTES) {
+      const message = 'Choose an image smaller than 8 MB.';
+      setUploadError(message);
+      reportError(message);
+      return;
+    }
     setUploadError('');
     setUploading(true);
     const saved = await onUpload(file);
-    if (!saved) setUploadError('The photo could not be saved. Check available browser storage and try again.');
+    if (!saved) setUploadError('The photo could not be shared. Check your connection and try again.');
     setUploading(false);
   };
 
@@ -250,7 +249,7 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
           <span>{uploading ? 'Saving photo...' : 'Upload photo'}</span>
           <input type="file" accept="image/*" onChange={chooseImage} disabled={uploading} />
         </label>
-        {(branch.imageId || branch.imageUrl) && <button className="text-button" type="button" onClick={onRemoveImage}>Remove photo</button>}
+        {(branch.imageId || branch.imagePath || branch.imageUrl) && <button className="text-button" type="button" onClick={onRemoveImage}>Remove photo</button>}
       </div>
       {uploadError && <p className="field-warning" role="alert">{uploadError}</p>}
     </div>
@@ -425,9 +424,12 @@ function App() {
   const [journeyRunId, setJourneyRunId] = useState(0);
   const [storageError, setStorageError] = useState('');
   const [saveState, setSaveState] = useState('');
-  const [storageEstimate, setStorageEstimate] = useState(null);
+  const [authState, setAuthState] = useState(() => CloudStore?.getAuthState?.() || EMPTY_AUTH_STATE);
+  const [remoteExists, setRemoteExists] = useState(false);
+  const [remoteReady, setRemoteReady] = useState(false);
   const siteRef = useRef(null);
   const saveQueueRef = useRef(Promise.resolve());
+  const lastSaveRef = useRef(Promise.resolve(false));
   const saveTimerRef = useRef(0);
   const initialRouteRef = useRef(true);
   const transitionRef = useRef(0);
@@ -435,32 +437,43 @@ function App() {
 
   siteRef.current = site;
   activeSlugRef.current = activeSlug;
-
-  const refreshStorageEstimate = () => {
-    Store.storageEstimate().then((estimate) => setStorageEstimate(estimate)).catch(() => setStorageEstimate(null));
-  };
+  const canEdit = Boolean(authState.configured && authState.isEditor);
 
   const reportError = (error) => setStorageError(typeof error === 'string' ? error : messageForError(error));
 
-  const persistDocument = (document) => {
-    saveQueueRef.current = saveQueueRef.current
+  const persistDocument = (documentToSave) => {
+    if (!canEdit || !CloudStore?.isConfigured?.()) {
+      reportError('Only approved team accounts can change this site.');
+      setSaveState('Not saved');
+      return Promise.resolve(false);
+    }
+    const snapshot = copy(documentToSave);
+    setSaveState('Saving for everyone...');
+    const save = saveQueueRef.current
       .catch(() => undefined)
-      .then(() => Store.saveDocument(document))
+      .then(() => CloudStore.saveDocument(snapshot))
       .then(() => {
-        setSaveState('Saved');
+        setSaveState('Saved for everyone');
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = window.setTimeout(() => setSaveState(''), 1800);
-        refreshStorageEstimate();
+        return true;
       })
       .catch((error) => {
         reportError(error);
         setSaveState('Not saved');
+        return false;
       });
+    saveQueueRef.current = save;
+    lastSaveRef.current = save;
+    return save;
   };
 
   const commitDocument = (updater) => {
     const current = siteRef.current;
-    if (!current) return null;
+    if (!current || !canEdit) {
+      if (!canEdit) reportError('Only approved team accounts can change this site.');
+      return null;
+    }
     const next = normaliseDocument(updater(copy(current)));
     siteRef.current = next;
     setSite(next);
@@ -481,43 +494,33 @@ function App() {
   useEffect(() => {
     let alive = true;
     const loader = window.showPageLoader?.() || Promise.resolve();
-    const initialise = async () => {
-      try {
-        const stored = await Store.loadDocument(DEFAULT_DOCUMENT, migrateLegacyDocument);
-        const siteDocument = normaliseDocument(stored);
-        const imageIdsToDelete = discardedSampleImageIds(stored, siteDocument);
-        let saved = false;
-        try {
-          await Store.saveDocument(siteDocument);
-          saved = true;
-        } catch (error) {
-          reportError(error);
-        }
-        if (saved && imageIdsToDelete.length) {
-          try {
-            await Store.deleteImages(imageIdsToDelete);
-          } catch (error) {
-            reportError(error);
-          }
-        }
-        if (!alive) return;
-        siteRef.current = siteDocument;
-        setSite(siteDocument);
-        const requestedSlug = readHashSlug();
-        const initialSlug = siteDocument.pages.some((page) => page.slug === requestedSlug) ? requestedSlug : 'intro';
-        if (requestedSlug !== initialSlug) window.history.replaceState(null, '', hashFor(initialSlug));
-        setActiveSlug(initialSlug);
-        document.body.classList.add('app-ready');
-        refreshStorageEstimate();
-      } catch (error) {
-        if (!alive) return;
-        reportError(error);
-        siteRef.current = copy(DEFAULT_DOCUMENT);
-        setSite(siteRef.current);
-        document.body.classList.add('app-ready');
-      }
+    const applyDocument = (remoteDocument, metadata = {}) => {
+      if (!alive) return;
+      const siteDocument = normaliseDocument(remoteDocument || DEFAULT_DOCUMENT);
+      siteRef.current = siteDocument;
+      setSite(siteDocument);
+      setRemoteExists(Boolean(metadata.exists));
+      setRemoteReady(!metadata.pending && !metadata.failed);
+      const requestedSlug = readHashSlug();
+      const initialSlug = siteDocument.pages.some((page) => page.slug === requestedSlug) ? requestedSlug : 'intro';
+      if (requestedSlug !== initialSlug) window.history.replaceState(null, '', hashFor(initialSlug));
+      setActiveSlug(initialSlug);
+      document.body.classList.add('app-ready');
     };
-    initialise();
+    let unsubscribeSite = () => {};
+    try {
+      if (CloudStore?.subscribeToDocument) {
+        unsubscribeSite = CloudStore.subscribeToDocument(applyDocument, (error) => {
+          reportError(error);
+          applyDocument(DEFAULT_DOCUMENT, { exists: false, failed: true });
+        });
+      } else {
+        applyDocument(DEFAULT_DOCUMENT, { exists: false });
+      }
+    } catch (error) {
+      reportError(error);
+      applyDocument(DEFAULT_DOCUMENT, { exists: false });
+    }
     Promise.resolve(loader).catch(() => undefined).then(() => {
       if (!alive) return;
       setIsLoading(false);
@@ -525,8 +528,17 @@ function App() {
     });
     return () => {
       alive = false;
+      unsubscribeSite();
       window.clearTimeout(saveTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    if (!CloudStore?.onAuthStateChange) return undefined;
+    return CloudStore.onAuthStateChange((nextAuthState) => {
+      setAuthState(nextAuthState || EMPTY_AUTH_STATE);
+      if (!nextAuthState?.isEditor) setMode('presentation');
+    });
   }, []);
 
   const routeKey = site ? site.pages.map((page) => `${page.id}:${page.slug}`).join('|') : '';
@@ -574,7 +586,7 @@ function App() {
   if (!site || !activePage) return <main className="app-boot">Preparing your Trouthy site...</main>;
 
   const selectedBranch = activePage.branches.find((branch) => branch.id === selectedBranchId) || activePage.branches[0] || null;
-  const editing = mode === 'editor';
+  const editing = mode === 'editor' && canEdit;
 
   const addPage = () => {
     const id = makeId('page');
@@ -620,15 +632,19 @@ function App() {
   const deletePage = async (pageId) => {
     const page = siteRef.current.pages.find((item) => item.id === pageId);
     if (!page || page.builtIn || !window.confirm(`Delete ${page.title} and all of its branch slides?`)) return;
-    const imageIds = page.branches.map((branch) => branch.imageId).filter(Boolean);
-    commitDocument((document) => {
+    const imagePaths = page.branches.map((branch) => branch.imagePath).filter(Boolean);
+    const next = commitDocument((document) => {
       document.pages = document.pages.filter((item) => item.id !== pageId);
       return document;
     });
-    try {
-      await Store.deleteImages(imageIds);
-    } catch (error) {
-      reportError(error);
+    if (!next) return;
+    const pathsToDelete = unreferencedImagePaths(next, imagePaths);
+    if (pathsToDelete.length && await lastSaveRef.current) {
+      try {
+        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
+      } catch (error) {
+        reportError(error);
+      }
     }
     if (page.slug === activeSlug) navigateTo('intro');
   };
@@ -637,7 +653,7 @@ function App() {
     const branchId = makeId('branch');
     commitDocument((document) => {
       const page = document.pages.find((item) => item.id === pageId);
-      if (page) page.branches.push({ id: branchId, title: '', body: '', imageId: null, imageUrl: '', ctaLabel: '', ctaUrl: '' });
+      if (page) page.branches.push({ id: branchId, title: '', body: '', imageId: null, imagePath: null, imageUrl: '', ctaLabel: '', ctaUrl: '' });
       return document;
     });
     setSelectedBranchId(branchId);
@@ -661,14 +677,16 @@ function App() {
   const deleteBranch = async (pageId, branchId) => {
     const branch = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((item) => item.id === branchId);
     if (!branch || !window.confirm(`Delete ${branch.title || 'this branch'}?`)) return;
-    commitDocument((document) => {
+    const next = commitDocument((document) => {
       const page = document.pages.find((item) => item.id === pageId);
       if (page) page.branches = page.branches.filter((item) => item.id !== branchId);
       return document;
     });
-    if (branch.imageId) {
+    if (!next) return;
+    const pathsToDelete = unreferencedImagePaths(next, [branch.imagePath]);
+    if (pathsToDelete.length && await lastSaveRef.current) {
       try {
-        await Store.deleteImage(branch.imageId);
+        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
       } catch (error) {
         reportError(error);
       }
@@ -676,17 +694,18 @@ function App() {
   };
 
   const uploadBranchImage = async (pageId, branchId, file) => {
-    const previousImageId = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((branch) => branch.id === branchId)?.imageId;
+    const previousImagePath = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((branch) => branch.id === branchId)?.imagePath;
     try {
-      const imageId = await Store.putImage(file);
+      const image = await CloudStore.uploadImage(file);
       const exists = siteRef.current.pages.find((page) => page.id === pageId)?.branches.some((branch) => branch.id === branchId);
       if (!exists) {
-        await Store.deleteImage(imageId);
+        await CloudStore.deleteImage(image.imagePath);
         return false;
       }
-      updateBranch(pageId, branchId, { imageId, imageUrl: '' });
-      if (previousImageId && previousImageId !== imageId) await Store.deleteImage(previousImageId);
-      refreshStorageEstimate();
+      const next = updateBranch(pageId, branchId, { imageId: null, imagePath: image.imagePath, imageUrl: image.imageUrl });
+      if (!next || !await lastSaveRef.current) return false;
+      const pathsToDelete = unreferencedImagePaths(next, [previousImagePath]);
+      if (pathsToDelete.length) await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
       return true;
     } catch (error) {
       reportError(error);
@@ -697,11 +716,12 @@ function App() {
   const removeBranchImage = async (pageId, branchId) => {
     const branch = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((item) => item.id === branchId);
     if (!branch) return;
-    updateBranch(pageId, branchId, { imageId: null, imageUrl: '' });
-    if (branch.imageId) {
+    const next = updateBranch(pageId, branchId, { imageId: null, imagePath: null, imageUrl: '' });
+    if (!next) return;
+    const pathsToDelete = unreferencedImagePaths(next, [branch.imagePath]);
+    if (pathsToDelete.length && await lastSaveRef.current) {
       try {
-        await Store.deleteImage(branch.imageId);
-        refreshStorageEstimate();
+        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
       } catch (error) {
         reportError(error);
       }
@@ -709,24 +729,69 @@ function App() {
   };
 
   const resetSite = async () => {
-    if (!window.confirm('Reset all page, branch, and uploaded image changes in this browser?')) return;
+    if (!window.confirm('Reset every shared page, branch, and uploaded photo for all visitors?')) return;
+    const imagePaths = siteRef.current.pages.flatMap((page) => page.branches.map((branch) => branch.imagePath)).filter(Boolean);
+    const next = commitDocument(() => copy(DEFAULT_DOCUMENT));
+    if (!next) return;
+    navigateTo('intro', true);
+    setSelectedBranchId(null);
+    setStorageError('');
+    const pathsToDelete = unreferencedImagePaths(next, imagePaths);
+    if (pathsToDelete.length && await lastSaveRef.current) {
+      try {
+        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
+      } catch (error) {
+        reportError(error);
+      }
+    }
+  };
+
+  const importLocalDraft = async () => {
+    if (!canEdit || remoteExists || !remoteReady || !LocalStore) return;
+    if (!window.confirm('Import this browser\'s existing local draft as the first shared Trouthy site?')) return;
     try {
-      await Store.reset();
-      const document = copy(DEFAULT_DOCUMENT);
-      siteRef.current = document;
-      setSite(document);
-      persistDocument(document);
-      navigateTo('intro', true);
-      setSelectedBranchId(null);
       setStorageError('');
+      setSaveState('Importing local draft...');
+      const localDocument = normaliseDocument(await LocalStore.loadDocument(DEFAULT_DOCUMENT, migrateLegacyDocument));
+      for (const page of localDocument.pages) {
+        for (const branch of page.branches) {
+          if (!branch.imageId) continue;
+          const localImage = await LocalStore.getImage(branch.imageId);
+          if (!localImage?.blob) {
+            branch.imageId = null;
+            continue;
+          }
+          const image = await CloudStore.uploadImage(localImage.blob);
+          branch.imageId = null;
+          branch.imagePath = image.imagePath;
+          branch.imageUrl = image.imageUrl;
+        }
+      }
+      await CloudStore.seedDocument(localDocument);
+      setSaveState('Saved for everyone');
+    } catch (error) {
+      reportError(error);
+      setSaveState('Not saved');
+    }
+  };
+
+  const signIn = async () => {
+    try {
+      setStorageError('');
+      await CloudStore.signIn();
     } catch (error) {
       reportError(error);
     }
   };
 
-  const storageLabel = storageEstimate?.usage && storageEstimate?.quota
-    ? `${Math.round(storageEstimate.usage / 1024 / 1024)} MB of ${Math.round(storageEstimate.quota / 1024 / 1024)} MB used`
-    : 'Stored in this browser';
+  const signOut = async () => {
+    try {
+      await CloudStore.signOut();
+      setMode('presentation');
+    } catch (error) {
+      reportError(error);
+    }
+  };
 
   return <div className={`site-app ${editing ? 'is-editing' : ''}`}>
     <header className="site-header">
@@ -735,9 +800,15 @@ function App() {
           <img className="brand-mark" src="icon.png" alt="" width="34" height="34" />
           <span><strong>Trouthy</strong></span>
         </button>
-        <div className="mode-switch" role="group" aria-label="Site mode">
-          <button className={mode === 'presentation' ? 'is-active' : ''} type="button" onClick={() => setMode('presentation')} aria-pressed={mode === 'presentation'}>View</button>
-          <button className={mode === 'editor' ? 'is-active' : ''} type="button" onClick={() => setMode('editor')} aria-pressed={mode === 'editor'}>Edit</button>
+        <div className="account-controls">
+          {canEdit && <div className="mode-switch" role="group" aria-label="Site mode">
+            <button className={mode === 'presentation' ? 'is-active' : ''} type="button" onClick={() => setMode('presentation')} aria-pressed={mode === 'presentation'}>View</button>
+            <button className={mode === 'editor' ? 'is-active' : ''} type="button" onClick={() => setMode('editor')} aria-pressed={mode === 'editor'}>Edit</button>
+          </div>}
+          {authState.user ? <>
+            <span className={`account-identity ${canEdit ? 'is-editor' : ''}`} title={authState.user.email}>{authState.user.email}</span>
+            <button className="text-button account-sign-out" type="button" onClick={signOut}>Sign out</button>
+          </> : authState.configured ? <button className="account-button" type="button" onClick={signIn}>Team sign in</button> : <span className="account-note" title={authState.setupError}>Team editing setup required</span>}
         </div>
       </div>
       <nav className="site-nav" aria-label="Pages">
@@ -749,10 +820,16 @@ function App() {
         <span>{storageError || saveState}</span>
         {storageError && <button type="button" className="icon-button" title="Dismiss message" aria-label="Dismiss message" onClick={() => setStorageError('')}>&times;</button>}
       </div>}
+      {!authState.configured && <aside className="access-notice" role="status">Team editing will be available after Firebase is configured.</aside>}
+      {authState.configured && authState.user && !canEdit && <aside className="access-notice" role="status">This Google account can view Trouthy, but it is not approved to edit.</aside>}
       {editing && <div className="editor-workspace">
         <div className="editor-workspace-header">
           <div><p className="eyebrow">Editor</p><h1>Build your route</h1></div>
-          <div className="editor-meta"><span>{storageLabel}</span><button className="text-button" type="button" onClick={resetSite}>Reset site</button></div>
+          <div className="editor-meta">
+            <span>Changes appear for everyone immediately.</span>
+            {!remoteExists && remoteReady && LocalStore && <button className="text-button" type="button" onClick={importLocalDraft}>Import local draft</button>}
+            <button className="text-button" type="button" onClick={resetSite}>Reset shared site</button>
+          </div>
         </div>
         <PageManager pages={site.pages} activeSlug={activeSlug} onNavigate={navigateTo} onAddPage={addPage} onUpdateTitle={updateCustomPageTitle} onUpdateSlug={updateCustomPageSlug} onMovePage={movePage} onDeletePage={deletePage} />
         <BranchEditor page={activePage} selectedBranchId={selectedBranchId} onSelectBranch={setSelectedBranchId} onAddBranch={addBranch} onUpdateBranch={updateBranch} onMoveBranch={moveBranch} onDeleteBranch={deleteBranch} onUploadImage={uploadBranchImage} onRemoveImage={removeBranchImage} reportError={reportError} />

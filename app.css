@@ -159,6 +159,65 @@ body:not(.app-ready) #root {
   background: var(--gold);
 }
 
+.account-controls {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.account-button {
+  min-height: 38px;
+  border: 1px solid var(--gold);
+  padding: 0.52rem 0.82rem;
+  color: var(--ink);
+  background: var(--gold);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.account-button:hover {
+  border-color: var(--paper);
+  color: var(--paper);
+  background: var(--red);
+}
+
+.account-identity,
+.account-note {
+  overflow: hidden;
+  color: #cad7da;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-identity {
+  max-width: 22ch;
+}
+
+.account-identity.is-editor {
+  color: var(--gold);
+}
+
+.account-note {
+  max-width: 20ch;
+  color: #d5e0e2;
+  text-align: right;
+}
+
+.site-header .account-sign-out {
+  flex: none;
+  color: #cad7da;
+  font-size: 0.74rem;
+}
+
+.site-header .account-sign-out:hover {
+  color: var(--gold);
+  background: transparent;
+}
+
 .site-nav {
   display: flex;
   align-items: stretch;
@@ -269,6 +328,16 @@ body:not(.app-ready) #root {
   border-left-color: var(--red);
   color: var(--red-deep);
   background: #f9e0dc;
+}
+
+.access-notice {
+  margin: 0 0 1.2rem;
+  border-left: 4px solid var(--gold);
+  padding: 0.7rem 0.8rem;
+  color: var(--ink-soft);
+  background: #fff0cf;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .editor-workspace {
@@ -829,6 +898,25 @@ body:not(.app-ready) #root {
 
   .brand small {
     display: none;
+  }
+
+  .account-controls {
+    gap: 0.45rem;
+  }
+
+  .account-identity {
+    max-width: 13ch;
+  }
+
+  .account-note {
+    max-width: 15ch;
+    font-size: 0.68rem;
+  }
+
+  .account-button {
+    min-height: 34px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.74rem;
   }
 
   .mode-switch button {
