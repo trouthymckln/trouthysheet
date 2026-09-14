@@ -7,7 +7,7 @@ const EMPTY_AUTH_STATE = {
   configured: false,
   user: null,
   isEditor: false,
-  setupError: 'Shared editing has not been configured yet.'
+  setupError: '尚未完成共享編輯設定。'
 };
 const BUILTIN_SLUGS = ['intro', 'events', 'policy', 'welfare'];
 const SAMPLE_BRANCH_IDS = new Set([
@@ -24,16 +24,16 @@ const DEFAULT_DOCUMENT = {
   version: 3,
   pages: [
     {
-      id: 'page-intro', slug: 'intro', title: 'Intro', builtIn: true, layout: 'vertical', branches: []
+      id: 'page-intro', slug: 'intro', title: '簡介', builtIn: true, layout: 'vertical', branches: []
     },
     {
-      id: 'page-events', slug: 'events', title: 'Events', builtIn: true, layout: 'vertical', branches: []
+      id: 'page-events', slug: 'events', title: '活動', builtIn: true, layout: 'vertical', branches: []
     },
     {
-      id: 'page-policy', slug: 'policy', title: 'Policy', builtIn: true, layout: 'vertical', branches: []
+      id: 'page-policy', slug: 'policy', title: '政策', builtIn: true, layout: 'vertical', branches: []
     },
     {
-      id: 'page-welfare', slug: 'welfare', title: 'Welfare', builtIn: true, layout: 'vertical', branches: []
+      id: 'page-welfare', slug: 'welfare', title: '福利', builtIn: true, layout: 'vertical', branches: []
     }
   ]
 };
@@ -148,12 +148,12 @@ const readHashSlug = () => {
 };
 
 const messageForError = (error) => {
-  if (error?.code === 'trouthy/not-configured') return 'Shared editing needs Firebase setup before changes can be saved.';
-  if (error?.code === 'trouthy/not-authorized' || error?.code === 'permission-denied' || error?.code === 'storage/unauthorized') return 'Only approved team accounts can change this site.';
-  if (error?.code === 'auth/popup-closed-by-user') return 'Google sign-in was closed before it finished.';
-  if (error?.code === 'storage/unauthenticated') return 'Sign in with an approved Google account before uploading a photo.';
-  if (error?.name === 'QuotaExceededError') return 'Browser storage is full. Remove an image or free up browser storage, then try again.';
-  return error?.message || 'The change could not be shared with everyone.';
+  if (error?.code === 'trouthy/not-configured') return '儲存變更前，請先完成 Firebase 共享編輯設定。';
+  if (error?.code === 'trouthy/not-authorized' || error?.code === 'permission-denied' || error?.code === 'storage/unauthorized') return '只有獲准的團隊帳號可以變更此網站。';
+  if (error?.code === 'auth/popup-closed-by-user') return 'Google 登入在完成前已關閉。';
+  if (error?.code === 'storage/unauthenticated') return '上傳照片前，請使用獲准的 Google 帳號登入。';
+  if (error?.name === 'QuotaExceededError') return '瀏覽器儲存空間已滿。請移除圖片或釋放空間後再試。';
+  return error?.message || '無法將變更分享給所有訪客。';
 };
 
 function BranchImage({ branch, alt, className = '', compact = false }) {
@@ -163,7 +163,7 @@ function BranchImage({ branch, alt, className = '', compact = false }) {
   useEffect(() => setFailed(false), [source]);
 
   if (!source || failed) {
-    return <div className={`image-placeholder ${compact ? 'image-placeholder-compact' : ''} ${className}`}>Photo ready for your story</div>;
+    return <div className={`image-placeholder ${compact ? 'image-placeholder-compact' : ''} ${className}`}>準備好加入照片</div>;
   }
 
   return <img className={className} src={source} alt={alt} onError={() => setFailed(true)} />;
@@ -175,10 +175,10 @@ function PageManager({ pages, activeSlug, onNavigate, onAddPage, onUpdateTitle, 
   return <section className="editor-section page-manager" aria-labelledby="page-manager-title">
     <div className="editor-section-heading">
       <div>
-        <p className="eyebrow">Structure</p>
-        <h2 id="page-manager-title">Pages</h2>
+        <p className="eyebrow">網站結構</p>
+        <h2 id="page-manager-title">頁面</h2>
       </div>
-      <button className="command-button command-primary" type="button" onClick={onAddPage}>+ New page</button>
+      <button className="command-button command-primary" type="button" onClick={onAddPage}>+ 新增頁面</button>
     </div>
     <div className="page-list">
       {pages.map((page) => {
@@ -187,16 +187,16 @@ function PageManager({ pages, activeSlug, onNavigate, onAddPage, onUpdateTitle, 
         return <article className={`page-row ${page.slug === activeSlug ? 'is-active' : ''}`} key={page.id}>
           <button className="page-open" type="button" onClick={() => onNavigate(page.slug)} aria-current={page.slug === activeSlug ? 'page' : undefined}>
             <span>{page.title}</span>
-            <small>{page.builtIn ? 'Built in' : `#/${page.slug}`}</small>
+            <small>{page.builtIn ? '內建' : `#/${page.slug}`}</small>
           </button>
           {isCustom && <div className="page-fields">
-            <label>Page name<input defaultValue={page.title} onBlur={(event) => onUpdateTitle(page.id, event.target.value)} /></label>
-            <label>URL slug<input defaultValue={page.slug} onBlur={(event) => onUpdateSlug(page.id, event.target.value)} /></label>
+            <label>頁面名稱<input defaultValue={page.title} onBlur={(event) => onUpdateTitle(page.id, event.target.value)} /></label>
+            <label>網址路徑<input defaultValue={page.slug} onBlur={(event) => onUpdateSlug(page.id, event.target.value)} /></label>
           </div>}
-          {isCustom && <div className="row-actions" aria-label={`Manage ${page.title}`}>
-            <button className="icon-button" type="button" title="Move page earlier" aria-label="Move page earlier" disabled={customPosition <= 0} onClick={() => onMovePage(page.id, -1)}>&uarr;</button>
-            <button className="icon-button" type="button" title="Move page later" aria-label="Move page later" disabled={customPosition === customPages.length - 1} onClick={() => onMovePage(page.id, 1)}>&darr;</button>
-            <button className="icon-button danger" type="button" title="Delete page" aria-label="Delete page" onClick={() => onDeletePage(page.id)}>&times;</button>
+          {isCustom && <div className="row-actions" aria-label={`管理 ${page.title}`}>
+            <button className="icon-button" type="button" title="將頁面向前移動" aria-label="將頁面向前移動" disabled={customPosition <= 0} onClick={() => onMovePage(page.id, -1)}>&uarr;</button>
+            <button className="icon-button" type="button" title="將頁面向後移動" aria-label="將頁面向後移動" disabled={customPosition === customPages.length - 1} onClick={() => onMovePage(page.id, 1)}>&darr;</button>
+            <button className="icon-button danger" type="button" title="刪除頁面" aria-label="刪除頁面" onClick={() => onDeletePage(page.id)}>&times;</button>
           </div>}
         </article>;
       })}
@@ -214,13 +214,13 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
     event.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      const message = 'Choose an image file for this branch.';
+      const message = '請為此分支選擇圖片檔案。';
       setUploadError(message);
       reportError(message);
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      const message = 'Choose an image smaller than 8 MB.';
+      const message = '請選擇小於 8 MB 的圖片。';
       setUploadError(message);
       reportError(message);
       return;
@@ -228,7 +228,7 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
     setUploadError('');
     setUploading(true);
     const saved = await onUpload(file);
-    if (!saved) setUploadError('The photo could not be shared. Check your connection and try again.');
+    if (!saved) setUploadError('無法分享照片。請檢查網絡連線後再試。');
     setUploading(false);
   };
 
@@ -236,27 +236,27 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
     <div className="branch-editor-number">{String(index + 1).padStart(2, '0')}</div>
     <button className="branch-editor-select" type="button" onClick={onSelect}>
       <BranchImage branch={branch} alt="" compact className="branch-thumbnail" />
-      <span>{branch.title || 'Untitled branch'}</span>
+      <span>{branch.title || '未命名分支'}</span>
     </button>
     <div className="branch-fields">
-      <label>Title<input value={branch.title} onChange={(event) => onChange({ title: event.target.value })} /></label>
-      <label>Description<textarea value={branch.body} onChange={(event) => onChange({ body: event.target.value })} rows="3" /></label>
-      <label>Button label<input value={branch.ctaLabel} placeholder="Optional button text" onChange={(event) => onChange({ ctaLabel: event.target.value })} /></label>
-      <label>Button URL<input type="url" value={branch.ctaUrl} placeholder="https://example.com" onChange={(event) => onChange({ ctaUrl: event.target.value })} /></label>
-      {!validUrl && <p className="field-warning">Use a full http:// or https:// link for the button.</p>}
+      <label>標題<input value={branch.title} onChange={(event) => onChange({ title: event.target.value })} /></label>
+      <label>說明<textarea value={branch.body} onChange={(event) => onChange({ body: event.target.value })} rows="3" /></label>
+      <label>按鈕文字<input value={branch.ctaLabel} placeholder="可選填的按鈕文字" onChange={(event) => onChange({ ctaLabel: event.target.value })} /></label>
+      <label>按鈕網址<input type="url" value={branch.ctaUrl} placeholder="https://example.com" onChange={(event) => onChange({ ctaUrl: event.target.value })} /></label>
+      {!validUrl && <p className="field-warning">請使用完整的 http:// 或 https:// 連結。</p>}
       <div className="branch-image-actions">
         <label className="file-picker">
-          <span>{uploading ? 'Saving photo...' : 'Upload photo'}</span>
+          <span>{uploading ? '正在儲存照片...' : '上傳照片'}</span>
           <input type="file" accept="image/*" onChange={chooseImage} disabled={uploading} />
         </label>
-        {(branch.imageId || branch.imagePath || branch.imageUrl) && <button className="text-button" type="button" onClick={onRemoveImage}>Remove photo</button>}
+        {(branch.imageId || branch.imagePath || branch.imageUrl) && <button className="text-button" type="button" onClick={onRemoveImage}>移除照片</button>}
       </div>
       {uploadError && <p className="field-warning" role="alert">{uploadError}</p>}
     </div>
-    <div className="row-actions branch-actions" aria-label={`Manage ${branch.title || 'branch'}`}>
-      <button className="icon-button" type="button" title="Move branch earlier" aria-label="Move branch earlier" disabled={index === 0} onClick={() => onMove(-1)}>&uarr;</button>
-      <button className="icon-button" type="button" title="Move branch later" aria-label="Move branch later" disabled={index === total - 1} onClick={() => onMove(1)}>&darr;</button>
-      <button className="icon-button danger" type="button" title="Delete branch" aria-label="Delete branch" onClick={onDelete}>&times;</button>
+    <div className="row-actions branch-actions" aria-label={`管理 ${branch.title || '此分支'}`}>
+      <button className="icon-button" type="button" title="將分支向前移動" aria-label="將分支向前移動" disabled={index === 0} onClick={() => onMove(-1)}>&uarr;</button>
+      <button className="icon-button" type="button" title="將分支向後移動" aria-label="將分支向後移動" disabled={index === total - 1} onClick={() => onMove(1)}>&darr;</button>
+      <button className="icon-button danger" type="button" title="刪除分支" aria-label="刪除分支" onClick={onDelete}>&times;</button>
     </div>
   </article>;
 }
@@ -265,10 +265,10 @@ function BranchEditor({ page, selectedBranchId, onSelectBranch, onAddBranch, onU
   return <section className="editor-section branch-editor" aria-labelledby="branch-editor-title">
     <div className="editor-section-heading">
       <div>
-        <p className="eyebrow">Route editor</p>
-        <h2 id="branch-editor-title">{page.title} branches</h2>
+        <p className="eyebrow">路線編輯器</p>
+        <h2 id="branch-editor-title">{page.title} 的分支</h2>
       </div>
-      <button className="command-button command-primary" type="button" onClick={() => onAddBranch(page.id)}>+ Add branch</button>
+      <button className="command-button command-primary" type="button" onClick={() => onAddBranch(page.id)}>+ 新增分支</button>
     </div>
     {page.branches.length ? <div className="branch-editor-list">
       {page.branches.map((branch, index) => <BranchEditorRow
@@ -285,7 +285,7 @@ function BranchEditor({ page, selectedBranchId, onSelectBranch, onAddBranch, onU
         onRemoveImage={() => onRemoveImage(page.id, branch.id)}
         reportError={reportError}
       />)}
-    </div> : <div className="empty-editor-state">No journey stops yet.</div>}
+    </div> : <div className="empty-editor-state">尚未建立旅程節點。</div>}
   </section>;
 }
 
@@ -295,14 +295,14 @@ function createJourneyGeometry(branches) {
   const startY = count === 1 ? Math.round(height / 2) : 118;
   const endY = height - 100;
   const step = count === 1 ? 0 : (endY - startY) / (count - 1);
-  const routeX = 260;
-  const cardX = 550;
+  const routeX = 380;
+  const branchOffset = 180;
   const stops = branches.map((branch, index) => ({
     id: branch.id,
     index,
     y: Math.round(startY + step * index),
     carX: routeX,
-    cardX
+    cardX: routeX + (index % 2 === 0 ? branchOffset : -branchOffset)
   }));
 
   return {
@@ -313,7 +313,7 @@ function createJourneyGeometry(branches) {
   };
 }
 
-function RouteJourney({ page, selectedBranchId, onSelectBranch, runId }) {
+function RouteJourney({ page, selectedBranchId, onSelectBranch, onOpenBranch, runId }) {
   const geometry = createJourneyGeometry(page.branches);
   const trackRef = useRef(null);
   const carRef = useRef(null);
@@ -361,15 +361,14 @@ function RouteJourney({ page, selectedBranchId, onSelectBranch, runId }) {
   }, [page.id, branchSignature, runId, geometry.height]);
 
   if (!page.branches.length) {
-    return <section className="journey journey-empty" aria-label={`${page.title} route`}>
-      <p>No branch slides have been added to this route yet.</p>
+    return <section className="journey journey-empty" aria-label={`${page.title} 路線`}>
+      <p>此路線尚未新增分支內容。</p>
     </section>;
   }
 
   return <section className="journey journey-vertical" aria-labelledby="journey-title">
     <div className="journey-heading">
-      <p className="eyebrow">Vertical journey</p>
-      <h2 id="journey-title">Explore the route</h2>
+      <h2 id="journey-title">探索路線</h2>
     </div>
     <div className="journey-canvas" style={{ height: `${geometry.height}px` }}>
       <svg className="journey-svg" viewBox={`0 0 760 ${geometry.height}`} aria-hidden="true" preserveAspectRatio="none">
@@ -382,17 +381,17 @@ function RouteJourney({ page, selectedBranchId, onSelectBranch, runId }) {
         type="button"
         className={`journey-stop ${index < revealedCount ? 'is-revealed' : ''} ${selectedBranchId === stop.id ? 'is-selected' : ''}`}
         style={{ left: `${(stop.cardX / 760) * 100}%`, top: `${(stop.y / geometry.height) * 100}%` }}
-        onClick={() => onSelectBranch(stop.id)}
+        onClick={() => onOpenBranch(stop.id)}
         aria-pressed={selectedBranchId === stop.id}
       >
         <span>{String(index + 1).padStart(2, '0')}</span>
-        <strong>{page.branches[index].title || 'Untitled branch'}</strong>
+        <strong>{page.branches[index].title || '未命名分支'}</strong>
       </button>)}
     </div>
   </section>;
 }
 
-function BranchSlide({ branch, branches, onSelectBranch }) {
+function BranchSlide({ branch, branches, onSelectBranch, copyRef }) {
   if (!branch) return null;
   const index = branches.findIndex((candidate) => candidate.id === branch.id);
   const destination = normaliseUrl(branch.ctaUrl);
@@ -400,16 +399,16 @@ function BranchSlide({ branch, branches, onSelectBranch }) {
   const next = branches[index + 1];
 
   return <article className="branch-slide" aria-labelledby={`slide-title-${branch.id}`}>
-    <div className="branch-slide-media"><BranchImage branch={branch} alt={branch.title || 'Branch image'} className="branch-slide-image" /></div>
-    <div className="branch-slide-copy">
+    <div className="branch-slide-media"><BranchImage branch={branch} alt={branch.title || '分支圖片'} className="branch-slide-image" /></div>
+    <div className="branch-slide-copy" ref={copyRef}>
       <p className="slide-count">{String(index + 1).padStart(2, '0')} / {String(branches.length).padStart(2, '0')}</p>
-      <h2 id={`slide-title-${branch.id}`}>{branch.title || 'Untitled branch'}</h2>
+      <h2 id={`slide-title-${branch.id}`}>{branch.title || '未命名分支'}</h2>
       {branch.body && <p>{branch.body}</p>}
       {destination && branch.ctaLabel && <a className="command-button command-primary" href={destination} target="_blank" rel="noreferrer">{branch.ctaLabel}</a>}
-      <div className="slide-controls" aria-label="Branch slide controls">
-        <button className="icon-button" type="button" title="Previous branch" aria-label="Previous branch" disabled={!previous} onClick={() => onSelectBranch(previous.id)}>&larr;</button>
-        <span>Branch {index + 1} of {branches.length}</span>
-        <button className="icon-button" type="button" title="Next branch" aria-label="Next branch" disabled={!next} onClick={() => onSelectBranch(next.id)}>&rarr;</button>
+      <div className="slide-controls" aria-label="分支控制">
+        <button className="icon-button" type="button" title="上一個分支" aria-label="上一個分支" disabled={!previous} onClick={() => onSelectBranch(previous.id)}>&larr;</button>
+        <span>第 {index + 1} 個，共 {branches.length} 個分支</span>
+        <button className="icon-button" type="button" title="下一個分支" aria-label="下一個分支" disabled={!next} onClick={() => onSelectBranch(next.id)}>&rarr;</button>
       </div>
     </div>
   </article>;
@@ -418,6 +417,7 @@ function BranchSlide({ branch, branches, onSelectBranch }) {
 function App() {
   const [site, setSite] = useState(null);
   const [mode, setMode] = useState('presentation');
+  const [headerMinimized, setHeaderMinimized] = useState(false);
   const [activeSlug, setActiveSlug] = useState('intro');
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -434,6 +434,7 @@ function App() {
   const initialRouteRef = useRef(true);
   const transitionRef = useRef(0);
   const activeSlugRef = useRef(activeSlug);
+  const branchCopyRef = useRef(null);
 
   siteRef.current = site;
   activeSlugRef.current = activeSlug;
@@ -443,24 +444,24 @@ function App() {
 
   const persistDocument = (documentToSave) => {
     if (!canEdit || !CloudStore?.isConfigured?.()) {
-      reportError('Only approved team accounts can change this site.');
-      setSaveState('Not saved');
+      reportError('只有獲准的團隊帳號可以變更此網站。');
+      setSaveState('未儲存');
       return Promise.resolve(false);
     }
     const snapshot = copy(documentToSave);
-    setSaveState('Saving for everyone...');
+    setSaveState('正在為所有訪客儲存...');
     const save = saveQueueRef.current
       .catch(() => undefined)
       .then(() => CloudStore.saveDocument(snapshot))
       .then(() => {
-        setSaveState('Saved for everyone');
+        setSaveState('已為所有訪客儲存');
         window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = window.setTimeout(() => setSaveState(''), 1800);
         return true;
       })
       .catch((error) => {
         reportError(error);
-        setSaveState('Not saved');
+        setSaveState('未儲存');
         return false;
       });
     saveQueueRef.current = save;
@@ -471,7 +472,7 @@ function App() {
   const commitDocument = (updater) => {
     const current = siteRef.current;
     if (!current || !canEdit) {
-      if (!canEdit) reportError('Only approved team accounts can change this site.');
+      if (!canEdit) reportError('只有獲准的團隊帳號可以變更此網站。');
       return null;
     }
     const next = normaliseDocument(updater(copy(current)));
@@ -583,7 +584,7 @@ function App() {
     });
   }, [activeSlug, activePageId]);
 
-  if (!site || !activePage) return <main className="app-boot">Preparing your Trouthy site...</main>;
+  if (!site || !activePage) return <main className="app-boot">正在準備 Trouthy 網站...</main>;
 
   const selectedBranch = activePage.branches.find((branch) => branch.id === selectedBranchId) || activePage.branches[0] || null;
   const editing = mode === 'editor' && canEdit;
@@ -592,7 +593,7 @@ function App() {
     const id = makeId('page');
     const next = commitDocument((document) => {
       const slug = uniqueSlug('new-page', new Set(document.pages.map((page) => page.slug)));
-      document.pages.push({ id, slug, title: 'New page', builtIn: false, layout: 'vertical', branches: [] });
+      document.pages.push({ id, slug, title: '新頁面', builtIn: false, layout: 'vertical', branches: [] });
       return document;
     });
     const page = next?.pages.find((item) => item.id === id);
@@ -631,7 +632,7 @@ function App() {
 
   const deletePage = async (pageId) => {
     const page = siteRef.current.pages.find((item) => item.id === pageId);
-    if (!page || page.builtIn || !window.confirm(`Delete ${page.title} and all of its branch slides?`)) return;
+    if (!page || page.builtIn || !window.confirm(`確定要刪除 ${page.title} 及其所有分支內容嗎？`)) return;
     const imagePaths = page.branches.map((branch) => branch.imagePath).filter(Boolean);
     const next = commitDocument((document) => {
       document.pages = document.pages.filter((item) => item.id !== pageId);
@@ -676,7 +677,7 @@ function App() {
 
   const deleteBranch = async (pageId, branchId) => {
     const branch = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((item) => item.id === branchId);
-    if (!branch || !window.confirm(`Delete ${branch.title || 'this branch'}?`)) return;
+    if (!branch || !window.confirm(`確定要刪除 ${branch.title || '此分支'} 嗎？`)) return;
     const next = commitDocument((document) => {
       const page = document.pages.find((item) => item.id === pageId);
       if (page) page.branches = page.branches.filter((item) => item.id !== branchId);
@@ -729,7 +730,7 @@ function App() {
   };
 
   const resetSite = async () => {
-    if (!window.confirm('Reset every shared page, branch, and uploaded photo for all visitors?')) return;
+    if (!window.confirm('確定要為所有訪客重設全部共享頁面、分支與已上傳的照片嗎？')) return;
     const imagePaths = siteRef.current.pages.flatMap((page) => page.branches.map((branch) => branch.imagePath)).filter(Boolean);
     const next = commitDocument(() => copy(DEFAULT_DOCUMENT));
     if (!next) return;
@@ -748,10 +749,10 @@ function App() {
 
   const importLocalDraft = async () => {
     if (!canEdit || remoteExists || !remoteReady || !LocalStore) return;
-    if (!window.confirm('Import this browser\'s existing local draft as the first shared Trouthy site?')) return;
+    if (!window.confirm('確定要將此瀏覽器的本機草稿匯入成第一個共享 Trouthy 網站嗎？')) return;
     try {
       setStorageError('');
-      setSaveState('Importing local draft...');
+      setSaveState('正在匯入本機草稿...');
       const localDocument = normaliseDocument(await LocalStore.loadDocument(DEFAULT_DOCUMENT, migrateLegacyDocument));
       for (const page of localDocument.pages) {
         for (const branch of page.branches) {
@@ -768,10 +769,10 @@ function App() {
         }
       }
       await CloudStore.seedDocument(localDocument);
-      setSaveState('Saved for everyone');
+      setSaveState('已為所有訪客儲存');
     } catch (error) {
       reportError(error);
-      setSaveState('Not saved');
+      setSaveState('未儲存');
     }
   };
 
@@ -793,54 +794,66 @@ function App() {
     }
   };
 
+  const openJourneyBranch = (branchId) => {
+    setSelectedBranchId(branchId);
+    window.requestAnimationFrame(() => {
+      branchCopyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   return <div className={`site-app ${editing ? 'is-editing' : ''}`}>
-    <header className="site-header">
+    <header className={`site-header ${headerMinimized ? 'is-minimized' : ''}`}>
       <div className="header-top">
-        <button className="brand" type="button" onClick={() => navigateTo('intro')} aria-label="Go to Intro">
+        <button className="brand" type="button" onClick={() => navigateTo('intro')} aria-label="前往簡介">
           <img className="brand-mark" src="icon.png" alt="" width="34" height="34" />
           <span><strong>Trouthy</strong></span>
         </button>
-        <div className="account-controls">
-          {canEdit && <div className="mode-switch" role="group" aria-label="Site mode">
-            <button className={mode === 'presentation' ? 'is-active' : ''} type="button" onClick={() => setMode('presentation')} aria-pressed={mode === 'presentation'}>View</button>
-            <button className={mode === 'editor' ? 'is-active' : ''} type="button" onClick={() => setMode('editor')} aria-pressed={mode === 'editor'}>Edit</button>
-          </div>}
-          {authState.user ? <>
-            <span className={`account-identity ${canEdit ? 'is-editor' : ''}`} title={authState.user.email}>{authState.user.email}</span>
-            <button className="text-button account-sign-out" type="button" onClick={signOut}>Sign out</button>
-          </> : authState.configured ? <button className="account-button" type="button" onClick={signIn}>Team sign in</button> : <span className="account-note" title={authState.setupError}>Team editing setup required</span>}
+        <div className="header-actions">
+          <div className="account-controls">
+            {canEdit && <div className="mode-switch" role="group" aria-label="網站模式">
+              <button className={mode === 'presentation' ? 'is-active' : ''} type="button" onClick={() => setMode('presentation')} aria-pressed={mode === 'presentation'}>瀏覽</button>
+              <button className={mode === 'editor' ? 'is-active' : ''} type="button" onClick={() => setMode('editor')} aria-pressed={mode === 'editor'}>編輯</button>
+            </div>}
+            {authState.user ? <>
+              <span className={`account-identity ${canEdit ? 'is-editor' : ''}`} title={authState.user.email}>{authState.user.email}</span>
+              <button className="text-button account-sign-out" type="button" onClick={signOut}>登出</button>
+            </> : authState.configured ? <button className="account-button" type="button" onClick={signIn}>團隊登入</button> : <span className="account-note" title={authState.setupError}>需要完成團隊編輯設定</span>}
+          </div>
         </div>
+        <button className="header-toggle" type="button" title={headerMinimized ? '還原標頭' : '縮小標頭'} aria-label={headerMinimized ? '還原標頭' : '縮小標頭'} aria-controls="site-pages" aria-expanded={!headerMinimized} onClick={() => setHeaderMinimized((minimized) => !minimized)}>{headerMinimized ? '+' : '\u2212'}</button>
       </div>
-      <nav className="site-nav" aria-label="Pages">
+      <nav className="site-nav" id="site-pages" aria-label="頁面">
         {site.pages.map((page) => <button key={page.id} type="button" className={page.slug === activeSlug ? 'is-active' : ''} aria-current={page.slug === activeSlug ? 'page' : undefined} onClick={() => navigateTo(page.slug)}>{page.title}</button>)}
       </nav>
     </header>
     <main className="site-main">
       {(storageError || saveState) && <div className={`save-status ${storageError ? 'has-error' : ''}`} role={storageError ? 'alert' : 'status'}>
         <span>{storageError || saveState}</span>
-        {storageError && <button type="button" className="icon-button" title="Dismiss message" aria-label="Dismiss message" onClick={() => setStorageError('')}>&times;</button>}
+        {storageError && <button type="button" className="icon-button" title="關閉訊息" aria-label="關閉訊息" onClick={() => setStorageError('')}>&times;</button>}
       </div>}
-      {!authState.configured && <aside className="access-notice" role="status">Team editing will be available after Firebase is configured.</aside>}
-      {authState.configured && authState.user && !canEdit && <aside className="access-notice" role="status">This Google account can view Trouthy, but it is not approved to edit.</aside>}
+      {!authState.configured && <aside className="access-notice" role="status">完成 Firebase 設定後，即可使用團隊編輯功能。</aside>}
+      {authState.configured && authState.user && !canEdit && <aside className="access-notice" role="status">此 Google 帳號可瀏覽 Trouthy，但尚未獲准編輯。</aside>}
       {editing && <div className="editor-workspace">
         <div className="editor-workspace-header">
-          <div><p className="eyebrow">Editor</p><h1>Build your route</h1></div>
+          <div><p className="eyebrow">編輯器</p><h1>建立你的路線</h1></div>
           <div className="editor-meta">
-            <span>Changes appear for everyone immediately.</span>
-            {!remoteExists && remoteReady && LocalStore && <button className="text-button" type="button" onClick={importLocalDraft}>Import local draft</button>}
-            <button className="text-button" type="button" onClick={resetSite}>Reset shared site</button>
+            <span>變更會立即顯示給所有訪客。</span>
+            {!remoteExists && remoteReady && LocalStore && <button className="text-button" type="button" onClick={importLocalDraft}>匯入本機草稿</button>}
+            <button className="icon-button" type="button" title="重設共享網站" aria-label="重設共享網站" onClick={resetSite}>&#8635;</button>
           </div>
         </div>
         <PageManager pages={site.pages} activeSlug={activeSlug} onNavigate={navigateTo} onAddPage={addPage} onUpdateTitle={updateCustomPageTitle} onUpdateSlug={updateCustomPageSlug} onMovePage={movePage} onDeletePage={deletePage} />
         <BranchEditor page={activePage} selectedBranchId={selectedBranchId} onSelectBranch={setSelectedBranchId} onAddBranch={addBranch} onUpdateBranch={updateBranch} onMoveBranch={moveBranch} onDeleteBranch={deleteBranch} onUploadImage={uploadBranchImage} onRemoveImage={removeBranchImage} reportError={reportError} />
       </div>}
       <section className="route-title-band">
-        <p className="eyebrow">{activePage.builtIn ? 'Trouthy route' : 'Custom route'}</p>
         <h1>{activePage.title}</h1>
-        <span>{activePage.branches.length} branch{activePage.branches.length === 1 ? '' : 'es'}</span>
+        <span>{activePage.branches.length} 個分支</span>
       </section>
-      {!isLoading && <RouteJourney key={`${activePage.id}-${journeyRunId}`} page={activePage} selectedBranchId={selectedBranchId} onSelectBranch={setSelectedBranchId} runId={journeyRunId} />}
-      <BranchSlide branch={selectedBranch} branches={activePage.branches} onSelectBranch={setSelectedBranchId} />
+      {!isLoading && <RouteJourney key={`${activePage.id}-${journeyRunId}`} page={activePage} selectedBranchId={selectedBranchId} onSelectBranch={setSelectedBranchId} onOpenBranch={openJourneyBranch} runId={journeyRunId} />}
+      <BranchSlide branch={selectedBranch} branches={activePage.branches} onSelectBranch={setSelectedBranchId} copyRef={branchCopyRef} />
+      <section className="page-closing-art" aria-label="Trouthy 結尾插圖">
+        <img src="trouthy-closing-art.png" alt="Trouthy 插圖：引擎在軌道上，Trouthy 與你同行。" loading="lazy" />
+      </section>
     </main>
     <footer className="site-footer">Trouthy</footer>
   </div>;
