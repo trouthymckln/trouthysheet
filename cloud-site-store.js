@@ -36,19 +36,19 @@
       database = app.firestore();
       storage = app.storage();
     } catch (error) {
-      setupError = error?.message || 'Firebase could not be initialized.';
+      setupError = error?.message || '無法初始化 Firebase。';
     }
   } else if (!isConfigured) {
-    setupError = 'Shared editing has not been configured yet.';
+    setupError = '尚未完成共享編輯設定。';
   } else {
-    setupError = 'Firebase libraries could not be loaded.';
+    setupError = '無法載入 Firebase 函式庫。';
   }
 
   const ready = () => Boolean(auth && database && storage);
   const normaliseUser = (user) => user ? {
     uid: user.uid,
     email: String(user.email || '').toLowerCase(),
-    displayName: user.displayName || user.email || 'Team member',
+    displayName: user.displayName || user.email || '團隊成員',
     photoURL: user.photoURL || ''
   } : null;
   const isEditor = (user) => Boolean(user?.email && editorEmails.has(String(user.email).toLowerCase()));
@@ -59,11 +59,11 @@
     setupError
   });
   const requireReady = () => {
-    if (!ready()) throw makeError(setupError || 'Shared editing is unavailable.', 'trouthy/not-configured');
+    if (!ready()) throw makeError(setupError || '共享編輯功能目前無法使用。', 'trouthy/not-configured');
   };
   const requireEditor = () => {
     requireReady();
-    if (!isEditor(auth.currentUser)) throw makeError('Only approved team accounts can change this site.', 'trouthy/not-authorized');
+    if (!isEditor(auth.currentUser)) throw makeError('只有獲准的團隊帳號可以變更此網站。', 'trouthy/not-authorized');
   };
   const siteRef = () => database.collection('sites').doc(siteId);
   const documentRecord = (document) => ({
@@ -128,7 +128,7 @@
       requireEditor();
       await database.runTransaction(async (transaction) => {
         const existing = await transaction.get(siteRef());
-        if (existing.exists) throw makeError('A shared Trouthy site already exists. Refresh before importing.', 'trouthy/site-exists');
+        if (existing.exists) throw makeError('共享 Trouthy 網站已存在。匯入前請重新整理。', 'trouthy/site-exists');
         transaction.set(siteRef(), documentRecord(document));
       });
     },
@@ -136,10 +136,10 @@
     async uploadImage(file) {
       requireEditor();
       if (!(file instanceof Blob) || !String(file.type || '').startsWith('image/')) {
-        throw makeError('Choose an image file for this branch.', 'trouthy/not-image');
+        throw makeError('請為此分支選擇圖片檔案。', 'trouthy/not-image');
       }
       if (file.size > maxImageBytes) {
-        throw makeError('Choose an image smaller than 8 MB.', 'trouthy/image-too-large');
+        throw makeError('請選擇小於 8 MB 的圖片。', 'trouthy/image-too-large');
       }
       const imagePath = imagePathFor(file);
       const reference = storage.ref().child(imagePath);
