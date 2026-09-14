@@ -74,6 +74,7 @@ const normaliseBranch = (branch, fallback = {}) => ({
   body: String(branch?.body ?? branch?.description ?? fallback.body ?? ''),
   imageId: typeof branch?.imageId === 'string' ? branch.imageId : null,
   imagePath: typeof branch?.imagePath === 'string' ? branch.imagePath : null,
+  imageProvider: branch?.imageProvider === 'firestore' ? 'firestore' : null,
   imageUrl: typeof branch?.imageUrl === 'string'
     ? branch.imageUrl
     : typeof branch?.image === 'string'
@@ -117,13 +118,6 @@ const normaliseDocument = (document) => {
   return { version: 3, pages: [...builtInPages, ...customPages] };
 };
 
-const unreferencedImagePaths = (document, imagePaths) => {
-  const retainedPaths = new Set(document.pages
-    .flatMap((page) => page.branches.map((branch) => branch.imagePath))
-    .filter(Boolean));
-  return [...new Set(imagePaths.filter((imagePath) => imagePath && !retainedPaths.has(imagePath)))];
-};
-
 const discardedSampleImageIds = (source, normalised) => {
   if ((Number(source?.version) || 1) >= 3 || !Array.isArray(source?.pages)) return [];
   const retainedImageIds = new Set(normalised.pages.flatMap((page) => page.branches.map((branch) => branch.imageId)).filter(Boolean));
@@ -132,6 +126,14 @@ const discardedSampleImageIds = (source, normalised) => {
     .flatMap((page) => Array.isArray(page.branches) ? page.branches : [])
     .filter((branch) => SAMPLE_BRANCH_IDS.has(String(branch?.id)) && branch?.imageId && !retainedImageIds.has(branch.imageId))
     .map((branch) => branch.imageId);
+};
+
+const unreferencedFirestoreImageIds = (document, imageIds) => {
+  const retainedImageIds = new Set(document.pages
+    .flatMap((page) => page.branches)
+    .filter((branch) => branch.imageProvider === 'firestore' && branch.imageId)
+    .map((branch) => branch.imageId));
+  return [...new Set(imageIds.filter((imageId) => imageId && !retainedImageIds.has(imageId)))];
 };
 
 const migrateLegacyDocument = () => copy(DEFAULT_DOCUMENT);
@@ -149,9 +151,14 @@ const readHashSlug = () => {
 
 const messageForError = (error) => {
   if (error?.code === 'trouthy/not-configured') return '儲存變更前，請先完成 Firebase 共享編輯設定。';
-  if (error?.code === 'trouthy/not-authorized' || error?.code === 'permission-denied' || error?.code === 'storage/unauthorized') return '只有獲准的團隊帳號可以變更此網站。';
+  if (error?.code === 'trouthy/not-authorized' || error?.code === 'permission-denied') return '只有獲准的團隊帳號可以變更此網站。';
   if (error?.code === 'auth/popup-closed-by-user') return 'Google 登入在完成前已關閉。';
-  if (error?.code === 'storage/unauthenticated') return '上傳照片前，請使用獲准的 Google 帳號登入。';
+  if (error?.code === 'trouthy/missing-token' || error?.code === 'trouthy/expired-token' || error?.code === 'trouthy/invalid-token') return '照片上傳前，請重新登入獲准的 Google 帳號。';
+  if (error?.code === 'trouthy/origin-not-allowed') return '此網站網址尚未加入圖片上傳服務的允許清單。';
+  if (error?.code === 'trouthy/firebase-keys-unavailable') return '目前無法驗證登入身分。請稍後再試。';
+  if (error?.code === 'trouthy/image-upload-failed') return '圖片主機拒絕了這次上傳。請稍後再試。';
+  if (error?.code === 'trouthy/not-image') return '請為此分支選擇圖片檔案。';
+  if (error?.code === 'trouthy/image-too-large') return '請選擇小於 8 MB 的圖片。';
   if (error?.name === 'QuotaExceededError') return '瀏覽器儲存空間已滿。請移除圖片或釋放空間後再試。';
   return error?.message || '無法將變更分享給所有訪客。';
 };
@@ -163,7 +170,7 @@ function BranchImage({ branch, alt, className = '', compact = false }) {
   useEffect(() => setFailed(false), [source]);
 
   if (!source || failed) {
-    return <div className={`image-placeholder ${compact ? 'image-placeholder-compact' : ''} ${className}`}>準備好加入照片</div>;
+    return <div className={`image-placeholder ${compact ? 'image-placeholder-compact' : ''} ${className}`} aria-hidden="true" />;
   }
 
   return <img className={className} src={source} alt={alt} onError={() => setFailed(true)} />;
@@ -227,9 +234,18 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
     }
     setUploadError('');
     setUploading(true);
-    const saved = await onUpload(file);
-    if (!saved) setUploadError('無法分享照片。請檢查網絡連線後再試。');
-    setUploading(false);
+    try {
+      const result = await onUpload(file);
+      if (!result?.saved) {
+        setUploadError(result?.message || '無法上傳照片。請檢查網絡連線後再試。');
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    onRemoveImage();
   };
 
   return <article className={`branch-editor-row ${selected ? 'is-selected' : ''}`}>
@@ -246,10 +262,10 @@ function BranchEditorRow({ branch, index, total, selected, onSelect, onChange, o
       {!validUrl && <p className="field-warning">請使用完整的 http:// 或 https:// 連結。</p>}
       <div className="branch-image-actions">
         <label className="file-picker">
-          <span>{uploading ? '正在儲存照片...' : '上傳照片'}</span>
+          <span>{uploading ? '正在處理照片...' : branch.imageUrl ? '更換照片' : '上傳照片'}</span>
           <input type="file" accept="image/*" onChange={chooseImage} disabled={uploading} />
         </label>
-        {(branch.imageId || branch.imagePath || branch.imageUrl) && <button className="text-button" type="button" onClick={onRemoveImage}>移除照片</button>}
+        {(branch.imageId || branch.imagePath || branch.imageUrl) && <button className="text-button" type="button" onClick={removeImage}>移除照片</button>}
       </div>
       {uploadError && <p className="field-warning" role="alert">{uploadError}</p>}
     </div>
@@ -395,11 +411,12 @@ function BranchSlide({ branch, branches, onSelectBranch, copyRef }) {
   if (!branch) return null;
   const index = branches.findIndex((candidate) => candidate.id === branch.id);
   const destination = normaliseUrl(branch.ctaUrl);
+  const hasImage = Boolean(branch.imageUrl);
   const previous = branches[index - 1];
   const next = branches[index + 1];
 
-  return <article className="branch-slide" aria-labelledby={`slide-title-${branch.id}`}>
-    <div className="branch-slide-media"><BranchImage branch={branch} alt={branch.title || '分支圖片'} className="branch-slide-image" /></div>
+  return <article className={`branch-slide ${hasImage ? 'has-image' : 'without-image'}`} aria-labelledby={`slide-title-${branch.id}`}>
+    {hasImage && <div className="branch-slide-media"><BranchImage branch={branch} alt={branch.title || '分支圖片'} className="branch-slide-image" /></div>}
     <div className="branch-slide-copy" ref={copyRef}>
       <p className="slide-count">{String(index + 1).padStart(2, '0')} / {String(branches.length).padStart(2, '0')}</p>
       <h2 id={`slide-title-${branch.id}`}>{branch.title || '未命名分支'}</h2>
@@ -630,23 +647,28 @@ function App() {
     return document;
   });
 
+  const deleteUnreferencedFirestoreImages = async (document, imageIds) => {
+    const imageIdsToDelete = unreferencedFirestoreImageIds(document, imageIds);
+    if (!imageIdsToDelete.length || !await lastSaveRef.current) return;
+    try {
+      await Promise.all(imageIdsToDelete.map((imageId) => CloudStore.deleteImage(imageId)));
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
   const deletePage = async (pageId) => {
     const page = siteRef.current.pages.find((item) => item.id === pageId);
     if (!page || page.builtIn || !window.confirm(`確定要刪除 ${page.title} 及其所有分支內容嗎？`)) return;
-    const imagePaths = page.branches.map((branch) => branch.imagePath).filter(Boolean);
+    const imageIds = page.branches
+      .filter((branch) => branch.imageProvider === 'firestore')
+      .map((branch) => branch.imageId);
     const next = commitDocument((document) => {
       document.pages = document.pages.filter((item) => item.id !== pageId);
       return document;
     });
     if (!next) return;
-    const pathsToDelete = unreferencedImagePaths(next, imagePaths);
-    if (pathsToDelete.length && await lastSaveRef.current) {
-      try {
-        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
-      } catch (error) {
-        reportError(error);
-      }
-    }
+    await deleteUnreferencedFirestoreImages(next, imageIds);
     if (page.slug === activeSlug) navigateTo('intro');
   };
 
@@ -654,7 +676,7 @@ function App() {
     const branchId = makeId('branch');
     commitDocument((document) => {
       const page = document.pages.find((item) => item.id === pageId);
-      if (page) page.branches.push({ id: branchId, title: '', body: '', imageId: null, imagePath: null, imageUrl: '', ctaLabel: '', ctaUrl: '' });
+      if (page) page.branches.push({ id: branchId, title: '', body: '', imageId: null, imagePath: null, imageProvider: null, imageUrl: '', ctaLabel: '', ctaUrl: '' });
       return document;
     });
     setSelectedBranchId(branchId);
@@ -684,67 +706,58 @@ function App() {
       return document;
     });
     if (!next) return;
-    const pathsToDelete = unreferencedImagePaths(next, [branch.imagePath]);
-    if (pathsToDelete.length && await lastSaveRef.current) {
-      try {
-        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
-      } catch (error) {
-        reportError(error);
-      }
-    }
+    if (branch.imageProvider === 'firestore') await deleteUnreferencedFirestoreImages(next, [branch.imageId]);
   };
 
   const uploadBranchImage = async (pageId, branchId, file) => {
-    const previousImagePath = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((branch) => branch.id === branchId)?.imagePath;
+    const previousImage = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((branch) => branch.id === branchId);
     try {
       const image = await CloudStore.uploadImage(file);
       const exists = siteRef.current.pages.find((page) => page.id === pageId)?.branches.some((branch) => branch.id === branchId);
       if (!exists) {
-        await CloudStore.deleteImage(image.imagePath);
-        return false;
+        await CloudStore.deleteImage(image.imageId);
+        return { saved: false };
       }
-      const next = updateBranch(pageId, branchId, { imageId: null, imagePath: image.imagePath, imageUrl: image.imageUrl });
-      if (!next || !await lastSaveRef.current) return false;
-      const pathsToDelete = unreferencedImagePaths(next, [previousImagePath]);
-      if (pathsToDelete.length) await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
-      return true;
+      const next = updateBranch(pageId, branchId, {
+        imageId: image.imageId,
+        imagePath: null,
+        imageProvider: image.imageProvider,
+        imageUrl: image.imageUrl
+      });
+      if (next && await lastSaveRef.current) {
+        if (previousImage?.imageProvider === 'firestore') await deleteUnreferencedFirestoreImages(next, [previousImage.imageId]);
+        return { saved: true };
+      }
+      await CloudStore.deleteImage(image.imageId);
+      return { saved: false };
     } catch (error) {
       reportError(error);
-      return false;
+      return {
+        saved: false,
+        message: messageForError(error)
+      };
     }
   };
 
   const removeBranchImage = async (pageId, branchId) => {
     const branch = siteRef.current.pages.find((page) => page.id === pageId)?.branches.find((item) => item.id === branchId);
     if (!branch) return;
-    const next = updateBranch(pageId, branchId, { imageId: null, imagePath: null, imageUrl: '' });
-    if (!next) return;
-    const pathsToDelete = unreferencedImagePaths(next, [branch.imagePath]);
-    if (pathsToDelete.length && await lastSaveRef.current) {
-      try {
-        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
-      } catch (error) {
-        reportError(error);
-      }
-    }
+    const next = updateBranch(pageId, branchId, { imageId: null, imagePath: null, imageProvider: null, imageUrl: '' });
+    if (next && branch.imageProvider === 'firestore') await deleteUnreferencedFirestoreImages(next, [branch.imageId]);
   };
 
   const resetSite = async () => {
-    if (!window.confirm('確定要為所有訪客重設全部共享頁面、分支與已上傳的照片嗎？')) return;
-    const imagePaths = siteRef.current.pages.flatMap((page) => page.branches.map((branch) => branch.imagePath)).filter(Boolean);
+    if (!window.confirm('確定要為所有訪客重設全部共享頁面與分支內容嗎？')) return;
+    const imageIds = siteRef.current.pages
+      .flatMap((page) => page.branches)
+      .filter((branch) => branch.imageProvider === 'firestore')
+      .map((branch) => branch.imageId);
     const next = commitDocument(() => copy(DEFAULT_DOCUMENT));
     if (!next) return;
+    await deleteUnreferencedFirestoreImages(next, imageIds);
     navigateTo('intro', true);
     setSelectedBranchId(null);
     setStorageError('');
-    const pathsToDelete = unreferencedImagePaths(next, imagePaths);
-    if (pathsToDelete.length && await lastSaveRef.current) {
-      try {
-        await Promise.all(pathsToDelete.map((imagePath) => CloudStore.deleteImage(imagePath)));
-      } catch (error) {
-        reportError(error);
-      }
-    }
   };
 
   const importLocalDraft = async () => {
@@ -754,22 +767,19 @@ function App() {
       setStorageError('');
       setSaveState('正在匯入本機草稿...');
       const localDocument = normaliseDocument(await LocalStore.loadDocument(DEFAULT_DOCUMENT, migrateLegacyDocument));
+      let discardedLocalImageCount = 0;
       for (const page of localDocument.pages) {
         for (const branch of page.branches) {
           if (!branch.imageId) continue;
-          const localImage = await LocalStore.getImage(branch.imageId);
-          if (!localImage?.blob) {
-            branch.imageId = null;
-            continue;
-          }
-          const image = await CloudStore.uploadImage(localImage.blob);
+          discardedLocalImageCount += 1;
           branch.imageId = null;
-          branch.imagePath = image.imagePath;
-          branch.imageUrl = image.imageUrl;
+          branch.imagePath = null;
+          branch.imageProvider = null;
+          branch.imageUrl = '';
         }
       }
       await CloudStore.seedDocument(localDocument);
-      setSaveState('已為所有訪客儲存');
+      setSaveState(discardedLocalImageCount ? '已為所有訪客儲存。本機照片未匯入，請重新上傳照片。' : '已為所有訪客儲存');
     } catch (error) {
       reportError(error);
       setSaveState('未儲存');

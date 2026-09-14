@@ -862,6 +862,10 @@ body:not(.app-ready) #root {
   background: var(--paper-deep);
 }
 
+.branch-slide.without-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .branch-slide-media {
   min-height: 330px;
   background: var(--ink);
@@ -898,6 +902,14 @@ body:not(.app-ready) #root {
   justify-content: center;
   padding: clamp(1.5rem, 4vw, 4rem);
   scroll-margin-top: 8rem;
+}
+
+.branch-slide.without-image .branch-slide-copy > p:not(.slide-count) {
+  max-width: 78ch;
+}
+
+.branch-slide.without-image .branch-slide-copy h2 {
+  max-width: none;
 }
 
 .branch-slide-copy h2 {
