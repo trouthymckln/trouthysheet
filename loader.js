@@ -14,7 +14,7 @@
     overlay.setAttribute('aria-live', 'polite');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;opacity:1;transition:opacity 500ms ease;';
     const fallback = document.createElement('div');
-    fallback.setAttribute('aria-label', 'Loading');
+    fallback.setAttribute('aria-label', '載入中');
     fallback.style.cssText = 'position:absolute;width:3.5rem;height:3.5rem;border:4px solid #e5d4c5;border-top-color:#8c2727;border-radius:50%;animation:loader-spin .8s linear infinite;';
     const badge = document.createElement('video');
     badge.autoplay = true;
@@ -30,10 +30,10 @@
     badge.className = 'w-52 h-52 object-contain mx-auto';
     badge.src = './loading.mp4';
     badge.style.cssText = 'position:relative;width:13rem;height:13rem;object-fit:contain;margin:0 auto;';
-    badge.setAttribute('aria-label', 'Trouthy loading');
+    badge.setAttribute('aria-label', 'Trouthy 載入中');
     const loadingLabel = document.createElement('p');
     loadingLabel.className = 'loading-label';
-    loadingLabel.append('Loading');
+    loadingLabel.append('載入中');
     [0, 1, 2].forEach((index) => {
       const dot = document.createElement('span');
       dot.className = 'loading-dot';
@@ -42,7 +42,7 @@
       loadingLabel.append(dot);
     });
     const playVideo = () => badge.play().catch((err) => {
-      if (err.name !== 'AbortError') console.error('Autoplay blocked or file missing:', err);
+      if (err.name !== 'AbortError') console.error('自動播放遭封鎖或檔案遺失：', err);
       fallback.style.display = 'block';
     });
     badge.addEventListener('canplay', playVideo, { once: true });

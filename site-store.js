@@ -12,7 +12,7 @@
 
   const openDatabase = () => {
     if (databasePromise) return databasePromise;
-    if (!window.indexedDB) return Promise.reject(new Error('This browser does not support persistent browser storage.'));
+    if (!window.indexedDB) return Promise.reject(new Error('此瀏覽器不支援持久化儲存。'));
 
     databasePromise = new Promise((resolve, reject) => {
       const request = window.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
@@ -22,8 +22,8 @@
         if (!database.objectStoreNames.contains(IMAGE_STORE)) database.createObjectStore(IMAGE_STORE, { keyPath: 'id' });
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error('Unable to open browser storage.'));
-      request.onblocked = () => reject(new Error('Browser storage is blocked by another open tab.'));
+      request.onerror = () => reject(request.error || new Error('無法開啟瀏覽器儲存空間。'));
+      request.onblocked = () => reject(new Error('另一個分頁正在使用瀏覽器儲存空間。'));
     });
     return databasePromise;
   };
@@ -33,7 +33,7 @@
     return new Promise((resolve, reject) => {
       const request = database.transaction(storeName, 'readonly').objectStore(storeName).get(key);
       request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error || new Error('Unable to read browser storage.'));
+      request.onerror = () => reject(request.error || new Error('無法讀取瀏覽器儲存空間。'));
     });
   };
 
@@ -43,8 +43,8 @@
       const transaction = database.transaction(storeName, 'readwrite');
       transaction.objectStore(storeName).put(record);
       transaction.oncomplete = () => resolve(record);
-      transaction.onerror = () => reject(transaction.error || new Error('Unable to save browser storage.'));
-      transaction.onabort = () => reject(transaction.error || new Error('Saving to browser storage was cancelled.'));
+      transaction.onerror = () => reject(transaction.error || new Error('無法儲存至瀏覽器儲存空間。'));
+      transaction.onabort = () => reject(transaction.error || new Error('已取消儲存至瀏覽器儲存空間。'));
     });
   };
 
@@ -57,8 +57,8 @@
       const store = transaction.objectStore(storeName);
       values.forEach((id) => store.delete(id));
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error('Unable to remove browser storage.'));
-      transaction.onabort = () => reject(transaction.error || new Error('Removing browser storage was cancelled.'));
+      transaction.onerror = () => reject(transaction.error || new Error('無法移除瀏覽器儲存資料。'));
+      transaction.onabort = () => reject(transaction.error || new Error('已取消移除瀏覽器儲存資料。'));
     });
   };
 
@@ -89,7 +89,7 @@
     },
 
     async putImage(file) {
-      if (!(file instanceof Blob)) throw new Error('Choose a valid image file before saving.');
+      if (!(file instanceof Blob)) throw new Error('儲存前請選擇有效的圖片檔案。');
       const record = {
         id: createId(),
         blob: file,
@@ -124,7 +124,7 @@
         const transaction = database.transaction(storeName, 'readwrite');
         transaction.objectStore(storeName).clear();
         transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error || new Error('Unable to reset browser storage.'));
+        transaction.onerror = () => reject(transaction.error || new Error('無法重設瀏覽器儲存空間。'));
       })));
     }
   });

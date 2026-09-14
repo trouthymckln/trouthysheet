@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Tracker</title>
+    <meta name="theme-color" content="#e2e8f0">
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #ffffff;
+            --paper: #ffffff;
+            --panel: #ffffff;
+            --panel-border: #0f172a;
+            --text: #0f172a;
+            --muted: #334155;
+            --line: #0f172a;
+            --primary: #1d4ed8;
+            --primary-strong: #0f172a;
+            --accent: #dc2626;
+            --accent-soft: #eff6ff;
+            --danger: #b91c1c;
+            --shadow: 6px 6px 0 rgba(15, 23, 42, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Trebuchet MS", "Comic Sans MS", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 12% 18%, rgba(29, 78, 216, 0.08), transparent 0 16%, transparent 18%),
+                radial-gradient(circle at 88% 12%, rgba(220, 38, 38, 0.10), transparent 0 15%, transparent 18%),
+                linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%);
+            padding: 28px 16px 40px;
+        }
+
+        .shell {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .hero {
+            display: grid;
+            gap: 18px;
+            margin-bottom: 22px;
+            color: var(--text);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            width: fit-content;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            border: 3px solid var(--line);
+            box-shadow: var(--shadow);
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: clamp(2.1rem, 5vw, 4.4rem);
+            line-height: 0.95;
+            letter-spacing: -0.05em;
+            max-width: 11ch;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 68ch;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.65;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .nav-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .view-tab {
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 3px solid var(--line);
+            background: #f1f5f9;
+            color: #0f172a;
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 1);
+            font-weight: 800;
+        }
+
+        .view-tab.active {
+            background: #bfdbfe;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .card {
+            background: #fafafa;
+            border: 3px solid var(--panel-border);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            inset: 10px;
+            border: 2px dashed rgba(15, 23, 42, 0.08);
+            border-radius: 22px;
+            pointer-events: none;
+        }
+
+        .form-card {
+            padding: 24px;
+        }
+
+        .summary-card {
+            padding: 22px;
+            position: sticky;
+            top: 24px;
+        }
+
+        .card-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .card-title {
+            margin: 0 0 6px;
+            font-size: 1.05rem;
+            letter-spacing: -0.02em;
+            font-weight: 900;
+        }
+
+        .card-subtitle {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 0.94rem;
+            line-height: 1.5;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 2px solid var(--line);
+            background: #e0f2fe;
+            color: var(--primary-strong);
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .sheet-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .connection-box {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 14px;
+            border-radius: 18px;
+            border: 3px solid var(--line);
+            background: #f8fafc;
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 1);
+        }
+
+        .connection-box label {
+            font-size: 0.82rem;
+        }
+
+        .connection-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .connection-actions button {
+            padding: 10px 12px;
+            font-size: 0.85rem;
+        }
+
+        .sheet-button {
+            width: auto;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            line-height: 1;
+            box-shadow: 3px 3px 0 rgba(248, 250, 252, 1);
+            white-space: nowrap;
+        }
+
+        form {
+            display: grid;
+            gap: 16px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field.full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 650;
+            letter-spacing: 0.01em;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border: 3px solid var(--line);
+            border-radius: 16px;
+            padding: 13px 14px;
+            font: inherit;
+            color: var(--text);
+            background: #f8fafc;
+            transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+        }
+
+        textarea {
+            min-height: 118px;
+            resize: vertical;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 0.12);
+            transform: translateY(-1px);
+        }
+
+        input[readonly] {
+            background: var(--accent-soft);
+            color: #0f172a;
+        }
+
+        .hint {
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.4;
+        }
+
+        .metric {
+            display: grid;
+            gap: 6px;
+            padding: 16px;
+            border-radius: 20px;
+            background: linear-gradient(180deg, #e0f2fe, #f8fafc);
+            border: 3px solid var(--line);
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 1);
+        }
+
+        .metric-label {
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 750;
+            letter-spacing: -0.04em;
+        }
+
+        .metric-note {
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        .stack {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pill {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 0.85rem;
+            border: 3px solid var(--line);
+            box-shadow: 3px 3px 0 rgba(15, 23, 42, 1);
+            font-weight: 800;
+        }
+
+        .stack-tall {
+            display: grid;
+            gap: 14px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-top: 6px;
+        }
+
+        button {
+            appearance: none;
+            border: 3px solid var(--line);
+            border-radius: 16px;
+            padding: 14px 18px;
+            font: inherit;
+            font-weight: 700;
+            color: #0f172a;
+            background: linear-gradient(135deg, #f8fafc, #bfdbfe);
+            box-shadow: 5px 5px 0 rgba(15, 23, 42, 1);
+            cursor: pointer;
+            transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+        }
+
+        button:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 7px 7px 0 rgba(15, 23, 42, 1);
+        }
+
+        button:disabled {
+            opacity: 0.65;
+            cursor: progress;
+            transform: none;
+        }
+
+        .secondary {
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            color: #0f172a;
+            box-shadow: none;
+        }
+
+        .ghost {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+
+        .ghost:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .danger {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+        }
+
+        .status {
+            min-height: 1.2em;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .status.success {
+            color: #1d4ed8;
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        .footer-note {
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.5;
+        }
+
+        .item-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .history-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+        }
+
+        .history-subtitle {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .history-summary {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .history-total {
+            padding: 14px;
+            border-radius: 18px;
+            border: 3px solid var(--line);
+            background: linear-gradient(180deg, #eff6ff, #ffffff);
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 1);
+        }
+
+        .history-total-label {
+            margin: 0 0 6px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .history-total-value {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+        }
+
+        .empty-state {
+            padding: 18px;
+            border-radius: 18px;
+            background: #f8fafc;
+            border: 3px dashed rgba(15, 23, 42, 0.35);
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .item-card {
+            padding: 14px;
+            border-radius: 18px;
+            border: 3px solid var(--line);
+            background: linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%);
+            box-shadow: 4px 4px 0 rgba(15, 23, 42, 1);
+            display: grid;
+            gap: 10px;
+        }
+
+        .history-record {
+            display: grid;
+            gap: 8px;
+        }
+
+        .item-card-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .item-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 900;
+        }
+
+        .item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .item-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .item-mini {
+            padding: 9px 10px;
+            font-size: 0.82rem;
+            border-radius: 12px;
+            box-shadow: 3px 3px 0 rgba(15, 23, 42, 1);
+        }
+
+        .section-split {
+            display: grid;
+            gap: 14px;
+            margin-top: 4px;
+        }
+
+        .divider {
+            height: 3px;
+            background: repeating-linear-gradient(90deg, var(--accent) 0 18px, #ffffff 18px 28px, #1d4ed8 28px 46px);
+            border-radius: 999px;
+        }
+
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-card {
+                position: static;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 16px 12px 24px;
+            }
+
+            .form-card,
+            .summary-card {
+                padding: 18px;
+                border-radius: 20px;
+            }
+
+            .hero h1 {
+                max-width: none;
+            }
+
+            button,
+            .secondary,
+            .ghost,
+            .danger {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <div class="eyebrow">Activity Tracker</div>
+            <h1>Draw it, drop it, list it.</h1>
+            <p>
+                Start with the list if you want, add activities when you're ready, and sync any item to Google Sheets later.
+            </p>
+            <div class="nav-row">
+                <button class="view-tab active" type="button" data-view-target="entryView">Add Event</button>
+                <button class="view-tab" type="button" data-view-target="historyView">History Page</button>
+            </div>
+        </section>
+
+        <section class="layout view active" id="entryView">
+            <article class="card form-card">
+                <div class="card-header-row">
+                    <div>
+                        <h2 class="card-title">New activity</h2>
+                        <p class="card-subtitle">Add an item to your list, or send it to Sheets when needed.</p>
+                    </div>
+                    <div class="badge">Cartoon mode</div>
+                </div>
+
+                <form id="activityForm" novalidate>
+                    <div class="grid">
+                        <div class="field full">
+                            <label for="activityId">Activity ID</label>
+                            <input type="text" id="activityId" name="activityId" readonly>
+                            <div class="hint">Generated automatically from the current Unix timestamp in milliseconds.</div>
+                        </div>
+
+                        <div class="field">
+                            <label for="date">Date</label>
+                            <input type="date" id="date" name="date" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="class">Class</label>
+                            <select id="class" name="class" required>
+                                <option value="Club">Club</option>
+                                <option value="Sports">Sports</option>
+                                <option value="Academic">Academic</option>
+                                <option value="Event">Event</option>
+                            </select>
+                        </div>
+
+                        <div class="field full">
+                            <label for="activityName">Activity Name</label>
+                            <input type="text" id="activityName" name="activityName" placeholder="Enter a short activity title" required>
+                        </div>
+
+                        <div class="field full">
+                            <label for="application">Application</label>
+                            <textarea id="application" name="application" placeholder="What was the purpose or use-case?" required></textarea>
+                        </div>
+
+                        <div class="field">
+                            <label for="size">Size</label>
+                            <select id="size" name="size" required>
+                                <option value="Small">Small</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Large">Large</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label for="participants">Participants</label>
+                            <input type="number" id="participants" name="participants" min="0" step="1" value="0" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="income">Income</label>
+                            <input type="number" id="income" name="income" min="0" step="0.01" value="0" required>
+                        </div>
+
+                        <div class="field">
+                            <label for="expense">Expense</label>
+                            <input type="number" id="expense" name="expense" min="0" step="0.01" value="0" required>
+                        </div>
+
+                        <div class="field full">
+                            <label for="netFlow">Net Flow</label>
+                            <input type="text" id="netFlow" name="netFlow" readonly>
+                            <div class="hint">Calculated live in the browser as Income minus Expense.</div>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                            <button id="submitButton" type="submit">Submit to Sheets</button>
+                        <button class="secondary" type="button" id="addToListButton">Add to List</button>
+                        <button class="ghost" type="button" id="regenButton">New ID</button>
+                    </div>
+
+                    <div id="status" class="status" aria-live="polite"></div>
+                        <div class="hint" id="editHint" hidden>Editing an existing history event.</div>
+                </form>
+            </article>
+
+        </section>
+
+        <section class="view" id="historyView">
+            <aside class="card summary-card">
+                <div class="connection-box">
+                    <label for="backendUrlInput">Google Apps Script Web App URL</label>
+                    <input id="backendUrlInput" type="text" placeholder="Paste the deployed Web App URL here">
+                    <div class="connection-actions">
+                        <button type="button" id="saveBackendUrlButton">Save Connection</button>
+                        <button class="ghost" type="button" id="clearBackendUrlButton">Clear</button>
+                    </div>
+                    <div class="hint">This connects the browser to your Apps Script Web App, which writes the data into Google Sheets.</div>
+                </div>
+
+                <div class="sheet-bar">
+                    <div>
+                        <h2 class="card-title">History page</h2>
+                        <p class="card-subtitle">Every saved event is shown here with its own net flow.</p>
+                    </div>
+                    <button class="sheet-button" type="button" id="syncAllButton">Sheet</button>
+                </div>
+
+                <div class="badge" id="itemCountBadge">0 items</div>
+
+                <div class="history-summary">
+                    <div class="history-total">
+                        <p class="history-total-label">Whole net flow</p>
+                        <p class="history-total-value" id="totalNetFlowValue">0.00</p>
+                    </div>
+                    <div class="history-total">
+                        <p class="history-total-label">Total events</p>
+                        <p class="history-total-value" id="totalEventsValue">0</p>
+                    </div>
+                </div>
+
+                <div class="section-split">
+                    <div class="history-record">
+                        <h3 class="history-title">Event record</h3>
+                        <p class="history-subtitle">Newest activity appears first. Each card shows its own auto-calculated net flow.</p>
+                    </div>
+
+                    <div class="item-list" id="itemList"></div>
+
+                    <div class="footer-note">
+                        The history is stored locally in this browser. Use the small Sheet button to push everything to Google Sheets.
+                    </div>
+                </div>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const backendUrl = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+        const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh';
+        const storageKey = 'activityTrackerItems';
+
+        const form = document.getElementById('activityForm');
+        const activityIdInput = document.getElementById('activityId');
+        const dateInput = document.getElementById('date');
+        const classInput = document.getElementById('class');
+        const sizeInput = document.getElementById('size');
+        const participantsInput = document.getElementById('participants');
+        const incomeInput = document.getElementById('income');
+        const expenseInput = document.getElementById('expense');
+        const netFlowInput = document.getElementById('netFlow');
+        const netFlowPreview = document.getElementById('netFlowPreview');
+        const previewClass = document.getElementById('previewClass');
+        const previewSize = document.getElementById('previewSize');
+        const previewParticipants = document.getElementById('previewParticipants');
+        const previewId = document.getElementById('previewId');
+        const status = document.getElementById('status');
+        const submitButton = document.getElementById('submitButton');
+        const addToListButton = document.getElementById('addToListButton');
+        const regenButton = document.getElementById('regenButton');
+        const itemList = document.getElementById('itemList');
+        const itemCountBadge = document.getElementById('itemCountBadge');
+        const syncAllButton = document.getElementById('syncAllButton');
+        const totalNetFlowValue = document.getElementById('totalNetFlowValue');
+        const totalEventsValue = document.getElementById('totalEventsValue');
+        const viewTabs = document.querySelectorAll('[data-view-target]');
+        const views = document.querySelectorAll('.view');
+        const editHint = document.getElementById('editHint');
+        const backendUrlInput = document.getElementById('backendUrlInput');
+        const saveBackendUrlButton = document.getElementById('saveBackendUrlButton');
+        const clearBackendUrlButton = document.getElementById('clearBackendUrlButton');
+
+        let localItems = loadItems();
+        let editingLocalId = null;
+        const defaultBackendUrl = 'PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE';
+
+        function encodeBase44(timestampMs) {
+            let value = BigInt(timestampMs);
+
+            if (value === 0n) {
+                return alphabet[0];
+            }
+
+            let encoded = '';
+            const base = 44n;
+
+            while (value > 0n) {
+                const remainder = Number(value % base);
+                encoded = alphabet[remainder] + encoded;
+                value = value / base;
+            }
+
+            return encoded;
+        }
+
+        function generateActivityId() {
+            const id = encodeBase44(Date.now());
+            activityIdInput.value = id;
+        }
+
+        function setFormMode(isEditing) {
+            submitButton.textContent = isEditing ? 'Save Changes to Sheets' : 'Submit to Sheets';
+            addToListButton.textContent = isEditing ? 'Update in List' : 'Add to List';
+            editHint.hidden = !isEditing;
+        }
+
+        function formatCurrencyLikeValue(value) {
+            return Number.isFinite(value) ? value.toFixed(2) : '0.00';
+        }
+
+        function getBackendUrl() {
+            return (localStorage.getItem('activityTrackerBackendUrl') || '').trim() || defaultBackendUrl;
+        }
+
+        function loadBackendUrl() {
+            backendUrlInput.value = localStorage.getItem('activityTrackerBackendUrl') || '';
+        }
+
+        function saveBackendUrl() {
+            const value = backendUrlInput.value.trim();
+
+            if (!value) {
+                localStorage.removeItem('activityTrackerBackendUrl');
+                setStatus('Connection cleared.', '');
+                return;
+            }
+
+            localStorage.setItem('activityTrackerBackendUrl', value);
+            setStatus('Google Sheet connection saved in this browser.', 'success');
+        }
+
+        function calculateNetFlow() {
+            const income = Number(incomeInput.value) || 0;
+            const expense = Number(expenseInput.value) || 0;
+            const netFlow = income - expense;
+
+            netFlowInput.value = formatCurrencyLikeValue(netFlow);
+            document.title = `Activity Tracker · ${formatCurrencyLikeValue(netFlow)}`;
+            renderItems();
+
+            return netFlow;
+        }
+
+        function switchView(targetId) {
+            views.forEach((view) => {
+                view.classList.toggle('active', view.id === targetId);
+            });
+
+            viewTabs.forEach((tab) => {
+                tab.classList.toggle('active', tab.dataset.viewTarget === targetId);
+            });
+        }
+
+        function setStatus(message, type = '') {
+            status.textContent = message;
+            status.className = `status ${type}`.trim();
+        }
+
+        function setTodayAsDefault() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            dateInput.value = `${year}-${month}-${day}`;
+        }
+
+        function loadItems() {
+            try {
+                return JSON.parse(localStorage.getItem(storageKey) || '[]');
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function saveItems(items) {
+            localStorage.setItem(storageKey, JSON.stringify(items));
+        }
+
+        function buildItemFromForm() {
+            calculateNetFlow();
+
+            return {
+                localId: editingLocalId || `${activityIdInput.value}-${Date.now()}`,
+                activityId: activityIdInput.value,
+                date: dateInput.value,
+                activityName: document.getElementById('activityName').value.trim(),
+                class: classInput.value,
+                application: document.getElementById('application').value.trim(),
+                size: sizeInput.value,
+                participants: Number(participantsInput.value) || 0,
+                income: Number(incomeInput.value) || 0,
+                expense: Number(expenseInput.value) || 0,
+                netFlow: Number(netFlowInput.value) || 0
+            };
+        }
+
+        function validateItem(item) {
+            if (!item.date || !item.activityName || !item.application) {
+                return 'Please enter a date, activity name, and application.';
+            }
+
+            return '';
+        }
+
+        function renderItems() {
+            itemCountBadge.textContent = `${localItems.length} item${localItems.length === 1 ? '' : 's'}`;
+            totalEventsValue.textContent = String(localItems.length);
+
+            const totalNetFlow = localItems.reduce((sum, item) => sum + (Number(item.netFlow) || 0), 0);
+            totalNetFlowValue.textContent = formatCurrencyLikeValue(totalNetFlow);
+
+            if (!localItems.length) {
+                itemList.innerHTML = '<div class="empty-state">Your list is empty. Add an item from the form to start building it.</div>';
+                return;
+            }
+
+            itemList.innerHTML = localItems.map((item) => `
+                <div class="item-card">
+                    <div class="item-card-header">
+                        <div>
+                            <p class="item-title">${escapeHtml(item.activityName)}</p>
+                            <div class="hint">${escapeHtml(item.date)} · ID ${escapeHtml(item.activityId)}</div>
+                        </div>
+                        <span class="badge">${escapeHtml(item.class)}</span>
+                    </div>
+                    <div class="item-meta">
+                        <span class="pill item-mini">${escapeHtml(item.size)}</span>
+                        <span class="pill item-mini">${Number(item.participants) || 0} people</span>
+                        <span class="pill item-mini">Net ${formatCurrencyLikeValue(Number(item.netFlow) || 0)}</span>
+                    </div>
+                    <div class="hint">${escapeHtml(item.application)}</div>
+                    <div class="item-actions">
+                        <button class="item-mini" type="button" data-action="edit" data-id="${escapeAttribute(item.localId)}">Edit</button>
+                        <button class="item-mini" type="button" data-action="sync" data-id="${escapeAttribute(item.localId)}">Sync</button>
+                        <button class="item-mini danger" type="button" data-action="remove" data-id="${escapeAttribute(item.localId)}">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function escapeAttribute(value) {
+            return escapeHtml(value).replaceAll('`', '&#96;');
+        }
+
+        function addCurrentItemToList() {
+            const item = buildItemFromForm();
+            const validationMessage = validateItem(item);
+
+            if (validationMessage) {
+                setStatus(validationMessage, 'error');
+                return;
+            }
+
+            const existingIndex = localItems.findIndex((entry) => entry.localId === item.localId);
+
+            if (existingIndex >= 0) {
+                localItems[existingIndex] = item;
+            } else {
+                localItems = [item, ...localItems];
+            }
+
+            saveItems(localItems);
+            renderItems();
+            setStatus(existingIndex >= 0 ? 'Updated the history item in your list.' : 'Added to your list. You can keep it here or sync it later.', 'success');
+            clearEditingState();
+        }
+
+        async function syncItemToSheet(item) {
+            const backendUrl = getBackendUrl();
+
+            if (backendUrl === defaultBackendUrl) {
+                setStatus('Paste your deployed Apps Script Web App URL before syncing.', 'error');
+                return;
+            }
+
+            try {
+                await fetch(backendUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
+                    body: JSON.stringify(item)
+                });
+
+                setStatus(`Synced ${item.activityName} to Sheets.`, 'success');
+            } catch (error) {
+                console.error('Sync error:', error);
+                setStatus('Sync failed. Check the Apps Script deployment URL and permissions.', 'error');
+            }
+        }
+
+        function removeItem(localId) {
+            localItems = localItems.filter((item) => item.localId !== localId);
+            saveItems(localItems);
+            renderItems();
+
+            if (editingLocalId === localId) {
+                clearEditingState();
+            }
+        }
+
+        function loadItemIntoForm(localId) {
+            const item = localItems.find((entry) => entry.localId === localId);
+
+            if (!item) {
+                return;
+            }
+
+            editingLocalId = item.localId;
+            activityIdInput.value = item.activityId;
+            dateInput.value = item.date;
+            document.getElementById('activityName').value = item.activityName;
+            classInput.value = item.class;
+            document.getElementById('application').value = item.application;
+            sizeInput.value = item.size;
+            participantsInput.value = Number(item.participants) || 0;
+            incomeInput.value = Number(item.income) || 0;
+            expenseInput.value = Number(item.expense) || 0;
+
+            calculateNetFlow();
+            setFormMode(true);
+            switchView('entryView');
+            setStatus('Loaded an existing event. Edit it, then save your changes.', 'success');
+        }
+
+        function clearEditingState() {
+            editingLocalId = null;
+            setFormMode(false);
+        }
+
+        async function syncAllItemsToSheet() {
+            if (!localItems.length) {
+                setStatus('No history items to sync yet.', '');
+                return;
+            }
+
+            syncAllButton.disabled = true;
+            setStatus('Syncing history to Sheets...', '');
+
+            try {
+                for (const item of localItems) {
+                    await syncItemToSheet(item);
+                }
+
+                setStatus('All history items were synced to Sheets.', 'success');
+            } finally {
+                syncAllButton.disabled = false;
+            }
+        }
+
+        function resetForNextEntry() {
+            form.reset();
+            setTodayAsDefault();
+            incomeInput.value = '0';
+            expenseInput.value = '0';
+            participantsInput.value = '0';
+            generateActivityId();
+            calculateNetFlow();
+            clearEditingState();
+        }
+
+        async function submitActivity(event) {
+            event.preventDefault();
+
+            const item = buildItemFromForm();
+            const validationMessage = validateItem(item);
+
+            if (validationMessage) {
+                setStatus(validationMessage, 'error');
+                return;
+            }
+
+            submitButton.disabled = true;
+            regenButton.disabled = true;
+            addToListButton.disabled = true;
+            setStatus('Submitting activity to Google Sheets and saving it locally...', '');
+
+            try {
+                const existingIndex = localItems.findIndex((entry) => entry.localId === item.localId);
+
+                if (existingIndex >= 0) {
+                    localItems[existingIndex] = item;
+                } else {
+                    localItems = [item, ...localItems];
+                }
+
+                saveItems(localItems);
+                renderItems();
+                await syncItemToSheet(item);
+                resetForNextEntry();
+            } catch (error) {
+                console.error('Submission error:', error);
+                setStatus('Submission failed. Check the backend URL and Apps Script deployment permissions.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                regenButton.disabled = false;
+                addToListButton.disabled = false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTodayAsDefault();
+            generateActivityId();
+            calculateNetFlow();
+            renderItems();
+            loadBackendUrl();
+            setFormMode(false);
+            setStatus('Ready when you are. Add items to the list, or sync them to Sheets later.', '');
+        });
+
+        incomeInput.addEventListener('input', calculateNetFlow);
+        expenseInput.addEventListener('input', calculateNetFlow);
+        participantsInput.addEventListener('input', calculateNetFlow);
+        classInput.addEventListener('change', calculateNetFlow);
+        sizeInput.addEventListener('change', calculateNetFlow);
+        regenButton.addEventListener('click', generateActivityId);
+        addToListButton.addEventListener('click', addCurrentItemToList);
+        syncAllButton.addEventListener('click', syncAllItemsToSheet);
+        saveBackendUrlButton.addEventListener('click', saveBackendUrl);
+        clearBackendUrlButton.addEventListener('click', () => {
+            backendUrlInput.value = '';
+            saveBackendUrl();
+        });
+        form.addEventListener('submit', submitActivity);
+        viewTabs.forEach((tab) => {
+            tab.addEventListener('click', () => switchView(tab.dataset.viewTarget));
+        });
+        itemList.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button) {
+                return;
+            }
+
+            const { action, id } = button.dataset;
+            const item = localItems.find((entry) => entry.localId === id);
+
+            if (!item) {
+                return;
+            }
+
+            if (action === 'remove') {
+                removeItem(id);
+                setStatus('Item removed from your list.', '');
+            }
+
+            if (action === 'edit') {
+                loadItemIntoForm(id);
+            }
+
+            if (action === 'sync') {
+                syncItemToSheet(item);
+            }
+        });
+    </script>
+</body>
+</html>
